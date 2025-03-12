@@ -19,17 +19,17 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if check_time(update):
         return
     await update.message.reply_text("""
-*Pi Wallet Bot*
+*Tele Forwarder Bot*
 
 Command yang dapat dilakukan:
 
 /help \\-\\> Show command ini
 
-/phrase *<24\\-phrase\\>* \\-\\> Perintah bot untuk search wallet berdasarkan 24 word phrase
+/add_source \\-\\> Tambah channel sebagai *sumber* message
 
-/wallet *<public\\-key\\>* \\-\\> Perintah bot untuk search wallet berdasarkan public key
+/add_dest \\-\\> Tambah channel sebagai *tujuan* message
 
-/change \\-\\> *Ganti user* Pi Account
+/setup \\-\\> Set source dengan tujuan
 """,
     parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -40,17 +40,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if check_time(update):
             return
         await update.message.reply_text("""
-*Pi Wallet Bot*
+*Tele Forwarder Bot*
 
 Command yang dapat dilakukan:
 
 /help \\-\\> Show command ini
 
-/phrase *<24\\-phrase\\>* \\-\\> Perintah bot untuk search wallet berdasarkan 24 word phrase
+/add_source \\-\\> Tambah channel sebagai *sumber* message
 
-/wallet *<public\\-key\\>* \\-\\> Perintah bot untuk search wallet berdasarkan public key
+/add_dest \\-\\> Tambah channel sebagai *tujuan* message
 
-/change \\-\\> *Ganti user* Pi Account
+/setup \\-\\> Set source dengan tujuan
 """,
     parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -251,24 +251,27 @@ def handle_response(text: str) -> str:
     return "Nothing known"
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if check_time(update):
-        return
-    message_type: str = update.message.chat.type # Group or Private Chat
-    text: str = update.message.text
+    data = update.to_json()
+    print(data)
+    # if check_time(update):
+    #     return
+    # message_type: str = update.message.chat.type # Group or Private Chat
+    # text: str = update.message.text
     
-    print(f"User: ({update.message.chat.id}) in {message_type} sent: {text}")
+    # print(f"User: ({update.message.chat.id}) in {message_type} sent: {text}\nMessage Details : {update.message.to_dict()}")
     
-    if message_type == 'group':
-        if BOT_USERNAME in text:
-            new_text: str = text.replace(BOT_USERNAME, '').strip()
-            response: str = handle_response(new_text)
-        else:
-            return
-    else: 
-        response: str = handle_response(text)
+    # if message_type == 'group':
+    #     if BOT_USERNAME in text:
+    #         new_text: str = text.replace(BOT_USERNAME, '').strip()
+    #         # response: str = handle_response(new_text)
+    #     else:
+    #         return
+    # else: 
+    #     # pass
+    #     response: str = handle_response(text)
     
-    print('Bot ', response )
-    await update.message.reply_text(response)
+    # print('Bot ', response )
+    # await update.message.reply_text(response)
     
 # async def stop()
 async def handle_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
