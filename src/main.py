@@ -1,14 +1,19 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.constants import ParseMode
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, ConversationHandler, filters, CallbackQueryHandler, CallbackContext, Defaults
 from modules.environment import BOT_USERNAME,TOKEN
 from typing import List
 import datetime
 from modules.utils import get_logger
 from telegram.error import NetworkError
 import sys
+import pytz
+
+
 logger = get_logger(__name__)
 # Commands
+
+SELECT, CONFIRM = range(2)
 
 def check_time(update: Update) -> bool:
     if update.message.date.timestamp() < datetime.datetime.now().timestamp() - 1200:
@@ -25,9 +30,9 @@ Command yang dapat dilakukan:
 
 /help \\-\\> Show command ini
 
-/add_source \\-\\> Tambah channel sebagai *sumber* message
+/add\\_source \\-\\> Tambah channel sebagai *sumber* message
 
-/add_dest \\-\\> Tambah channel sebagai *tujuan* message
+/add\\_dest \\-\\> Tambah channel sebagai *tujuan* message
 
 /setup \\-\\> Set source dengan tujuan
 """,
@@ -46,9 +51,9 @@ Command yang dapat dilakukan:
 
 /help \\-\\> Show command ini
 
-/add_source \\-\\> Tambah channel sebagai *sumber* message
+/add\\_source \\-\\> Tambah channel sebagai *sumber* message
 
-/add_dest \\-\\> Tambah channel sebagai *tujuan* message
+/add\\_dest \\-\\> Tambah channel sebagai *tujuan* message
 
 /setup \\-\\> Set source dengan tujuan
 """,
@@ -57,7 +62,35 @@ Command yang dapat dilakukan:
 
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")
+
+
+async def channel_get_data(update: Update, context: CallbackContext) -> int:
+    try:
+        message = update.message
+        data_forward = message.forward_origin
+        if data_forward.type != "channel":
+            await update.message.reply_text("Mohon forward data dari channel")
+            return SELECT
         
+        bot : Bot  = context.bot
+        
+        member = await bot.getChatMember(message.chat_id, bot.id)
+        rights = await bot.get_my_default_administrator_rights(True)
+        await update.message.reply_text(f"Member details : {rights}")
+        await update.message.reply_text(f"{data_forward.to_json()}")
+        return ConversationHandler.END
+    except Exception as e:
+        logger.error(f"Error retrieving passphrase details, {e}")
+        return "Error occured, please contact administrator"
+
+
+async def add_channel_command(update: Update, context: CallbackContext) -> int:
+    if check_time(update):
+        return
+    await update.message.reply_text("Forward message dari channel yang akan dijadikan source")
+    return SELECT
+
+
 # async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 #     """Parses the CallbackQuery and updates the message text."""
 #     query = update.callback_query
@@ -250,9 +283,21 @@ def handle_response(text: str) -> str:
         return "Test triggered"
     return "Nothing known"
 
+async def cancel_conv(update: Update, context: CallbackContext) -> int:
+    await update.message.reply_text("Jadwal telah di cancel")
+    return ConversationHandler.END
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = update.to_json()
-    print(data)
+    print(update.to_json())
+    # source_origin = update.message
+    # if source_origin == None:
+    #     await context.bot.send_message(chat_id=update.message.chat_id, text="Bukan dari forward")
+    #     return
+    
+    # print(source_origin.to_dict(recursive=True))
+    
+    # bot_rights = await context.bot.get_my_default_administrator_rights()
+    # print(bot_rights)
     # if check_time(update):
     #     return
     # message_type: str = update.message.chat.type # Group or Private Chat
@@ -282,11 +327,19 @@ async def handle_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sys.exit()
 
 if __name__ == "__main__":
-    app = Application.builder().token(TOKEN).build()
+    builder = Application.builder()
+    builder.token(TOKEN)
+    builder.defaults(Defaults(tzinfo=pytz.timezone('Asia/Jakarta')))
+    app = builder.build()
     logger.info("INITIALIZING Telegram Pi Wallet Bot")
-    # Command
-    app.add_handler(CommandHandler('start', start_command))
-    app.add_handler(CommandHandler('help', help_command))
+    
+    conv_handler =  ConversationHandler(
+        entry_points=[CommandHandler('add_source', add_channel_command)],
+        states={
+            SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, channel_get_data)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel_conv)]
+    )
     # app.add_handler(CommandHandler('wallet', from_wallet_command))
     # app.add_handler(CommandHandler('phrase', from_passphrase_command))
     # app.add_handler(CommandHandler('change', change_user_command))
@@ -295,6 +348,11 @@ if __name__ == "__main__":
     # app.add_handler(CommandHandler('print', print_page_command))
     # app.add_handler(CallbackQueryHandler(button))
     
+    # Command
+    app.add_handler(CommandHandler('start', start_command))
+    app.add_handler(CommandHandler('help', help_command))
+    app.add_handler(conv_handler)
+
     # Messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
     
